@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>六邊形合合樂 2048</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Fredoka+One&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a1628;
+    --bg2: #0d1f3c;
+    --panel: #112240;
+    --panel2: #1a3a5c;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --gold: #ffd700;
+    --glow: 0 0 20px rgba(0,212,255,0.4);
+    --tile-2:    #4fc3f7; --tile-2t:    #fff;
+    --tile-4:    #29b6f6; --tile-4t:    #fff;
+    --tile-8:    #f9a825; --tile-8t:    #fff;
+    --tile-16:   #fb8c00; --tile-16t:   #fff;
+    --tile-32:   #ef5350; --tile-32t:   #fff;
+    --tile-64:   #e53935; --tile-64t:   #fff;
+    --tile-128:  #ab47bc; --tile-128t:  #fff;
+    --tile-256:  #7b1fa2; --tile-256t:  #fff;
+    --tile-512:  #26a69a; --tile-512t:  #fff;
+    --tile-1024: #00897b; --tile-1024t: #fff;
+    --tile-2048: #ff6f00; --tile-2048t: #fff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    color: #fff;
+    min-height: 100vh;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Animated starfield background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 30%, rgba(0,212,255,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 70%, rgba(255,107,53,0.06) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .stars {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.6);
+    animation: twinkle linear infinite;
+  }
+  @keyframes twinkle {
+    0%,100% { opacity:0.1; transform:scale(1); }
+    50% { opacity:0.8; transform:scale(1.3); }
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 560px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  /* Header */
+  .header {
+    width: 100%;
+    text-align: center;
+  }
+  .title {
+    font-family: 'Fredoka One', cursive;
+    font-size: 2.4rem;
+    background: linear-gradient(135deg, var(--accent), var(--gold), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+  .subtitle {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  /* Score Board */
+  .scoreboard {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    align-items: stretch;
+  }
+  .score-card {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid rgba(0,212,255,0.15);
+    border-radius: 16px;
+    padding: 10px 14px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .score-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(0,212,255,0.05), transparent);
+    pointer-events: none;
+  }
+  .score-label {
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  .score-value {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.8rem;
+    color: var(--accent);
+    line-height: 1.1;
+  }
+  .score-card.best .score-value { color: var(--gold); }
+  .score-card.target-card { flex: 0 0 auto; width: 110px; }
+  .target-label { font-size: 0.6rem; color: rgba(255,255,255,0.4); letter-spacing: 1px; text-transform: uppercase; }
+  .target-hex-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 4px;
+  }
+  .target-hex {
+    width: 80px; height: 80px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Fredoka One', cursive;
+    font-size: clamp(0.75rem, 3vw, 1.1rem);
+    background: var(--tile-512);
+    clip-path: polygon(50% 0%,93.3% 25%,93.3% 75%,50% 100%,6.7% 75%,6.7% 25%);
+    color: #fff;
+    padding: 0 8px;
+    text-align: center;
+    word-break: break-all;
+    line-height: 1;
+    animation: targetPulse 2s ease-in-out infinite;
+  }
+  @keyframes targetPulse {
+    0%,100% { transform:scale(1); filter: brightness(1); }
+    50% { transform:scale(1.08); filter: brightness(1.2); }
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+  .btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.1s, filter 0.1s;
+    letter-spacing: 1px;
+  }
+  .btn:active { transform: scale(0.95); }
+  .btn-new {
+    background: linear-gradient(135deg, var(--accent2), #ff9a00);
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(255,107,53,0.4);
+  }
+  .btn-undo {
+    background: var(--panel2);
+    color: var(--accent);
+    border: 1px solid rgba(0,212,255,0.25);
+  }
+  .btn:hover { filter: brightness(1.1); }
+
+  /* Next piece preview */
+  .next-section {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid rgba(0,212,255,0.12);
+    border-radius: 18px;
+    padding: 12px 16px;
+  }
+  .next-label {
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.35);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+  .next-pieces {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 8px 6px;
+  }
+  .next-piece {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .next-piece:hover { transform: translateY(-4px) scale(1.05); }
+  .next-piece.selected .hex-tile {
+    filter: drop-shadow(0 0 10px rgba(0,212,255,0.8));
+    transform: scale(1.12);
+  }
+  .piece-size-label {
+    font-size: 0.6rem;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 1px;
+  }
+
+  /* Hexagon Grid */
+  .grid-container {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid rgba(0,212,255,0.12);
+    border-radius: 24px;
+    padding: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+
+  #hexCanvas {
+    display: block;
+    cursor: pointer;
+    border-radius: 12px;
+  }
+
+  /* Message overlay */
+  .message-overlay {
+    position: absolute;
+    inset: 0;
+    border-radius: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10,22,40,0.88);
+    backdrop-filter: blur(8px);
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .message-overlay.show { opacity: 1; pointer-events: all; }
+  .msg-title {
+    font-family: 'Fredoka One', cursive;
+    font-size: 2.8rem;
+    margin-bottom: 8px;
+  }
+  .msg-title.win { color: var(--gold); }
+  .msg-title.lose { color: #ef5350; }
+  .msg-sub { color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-bottom: 20px; }
+  .msg-score {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.5rem;
+    color: var(--accent);
+    margin-bottom: 20px;
+  }
+  .btn-msg {
+    padding: 12px 32px;
+    font-size: 1rem;
+    border-radius: 16px;
+    border: none;
+    font-family: 'Fredoka One', cursive;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--accent2), #ff9a00);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(255,107,53,0.5);
+    transition: transform 0.1s, filter 0.1s;
+  }
+  .btn-msg:hover { filter:brightness(1.1); }
+  .btn-msg:active { transform:scale(0.95); }
+
+  /* Score pop animation */
+  .score-pop {
+    position: fixed;
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.4rem;
+    color: var(--gold);
+    pointer-events: none;
+    z-index: 999;
+    animation: scorePop 1.2s ease-out forwards;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  @keyframes scorePop {
+    0% { transform: translateY(0) scale(1); opacity:1; }
+    100% { transform: translateY(-80px) scale(1.3); opacity:0; }
+  }
+
+  /* Instructions */
+  .instructions {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid rgba(0,212,255,0.08);
+    border-radius: 16px;
+    padding: 14px 16px;
+  }
+  .inst-title {
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.35);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+  .inst-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .inst-item {
+    background: rgba(0,212,255,0.07);
+    border: 1px solid rgba(0,212,255,0.12);
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.6);
+    flex: 1;
+    min-width: 120px;
+    text-align: center;
+  }
+  .inst-item span { color: var(--accent); font-weight: 900; }
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<div class="wrapper">
+  <div class="header">
+    <div class="title">⬡ HexPuz 2048</div>
+    <div class="subtitle">六邊形合合樂</div>
+  </div>
+
+  <div class="scoreboard">
+    <div class="score-card">
+      <div class="score-label">當前分數</div>
+      <div class="score-value" id="scoreDisplay">0</div>
+    </div>
+    <div class="score-card best">
+      <div class="score-label">歷史最高</div>
+      <div class="score-value" id="bestDisplay">0</div>
+    </div>
+    <div class="score-card target-card">
+      <div class="target-label">目標</div>
+      <div class="target-hex-wrap">
+        <div class="target-hex" id="targetDisplay">512</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-new" onclick="newGame()">🎮 新遊戲</button>
+    <button class="btn btn-undo" onclick="undoMove()">↩ 悔棋</button>
+  </div>
+
+  <div class="next-section">
+    <div class="next-label">選擇放置的方塊</div>
+    <div class="next-pieces" id="nextPieces"></div>
+  </div>
+
+  <div class="grid-container">
+    <canvas id="hexCanvas"></canvas>
+    <div class="message-overlay" id="msgOverlay">
+      <div class="msg-title" id="msgTitle">🎉 成功！</div>
+      <div class="msg-sub" id="msgSub">達成目標！</div>
+      <div class="msg-score" id="msgScore">分數: 0</div>
+      <button class="btn-msg" onclick="newGame()">再玩一次</button>
+    </div>
+  </div>
+
+  <div class="instructions">
+    <div class="inst-title">遊戲說明</div>
+    <div class="inst-row">
+      <div class="inst-item"><span>點選</span> 下方方塊選取</div>
+      <div class="inst-item"><span>點擊</span> 棋盤空格放置</div>
+      <div class="inst-item"><span>相同數字</span> 相鄰自動合併</div>
+      <div class="inst-item"><span>合併=翻倍</span> 得分+數值</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STAR BACKGROUND
+// ============================================================
+(function(){
+  const container = document.getElementById('stars');
+  for(let i=0;i<80;i++){
+    const s = document.createElement('div');
+    s.className = 'star';
+    const sz = Math.random()*2+0.5;
+    s.style.cssText = `
+      width:${sz}px;height:${sz}px;
+      left:${Math.random()*100}%;top:${Math.random()*100}%;
+      animation-duration:${2+Math.random()*4}s;
+      animation-delay:${-Math.random()*4}s;
+    `;
+    container.appendChild(s);
+  }
+})();
+
+// ============================================================
+// HEX GRID ENGINE
+// ============================================================
+const TILE_COLORS = {
+  0:    {bg:'#1a3a5c', text:'rgba(255,255,255,0.1)'},
+  2:    {bg:'#4fc3f7', text:'#fff'},
+  4:    {bg:'#29b6f6', text:'#fff'},
+  8:    {bg:'#f9a825', text:'#fff'},
+  16:   {bg:'#fb8c00', text:'#fff'},
+  32:   {bg:'#ef5350', text:'#fff'},
+  64:   {bg:'#e53935', text:'#fff'},
+  128:  {bg:'#ab47bc', text:'#fff'},
+  256:  {bg:'#7b1fa2', text:'#fff'},
+  512:  {bg:'#26a69a', text:'#fff'},
+  1024: {bg:'#00897b', text:'#fff'},
+  2048: {bg:'#ff6f00', text:'#fff'},
+  4096: {bg:'#d50000', text:'#fff'},
+};
+
+function getTileColor(val) {
+  return TILE_COLORS[val] || {bg:'#880e4f', text:'#fff'};
+}
+
+// Hex grid using axial coordinates (q, r) - flat-top hexagons
+// We use a diamond-shaped subset of hex coords for a hexagonal board
+class HexGame {
+  constructor(radius) {
+    this.radius = radius; // board radius (3 = 61 cells, 4=?)
+    this.cells = {};      // key:"q,r" -> value (0=empty)
+    this.score = 0;
+    this.best = parseInt(localStorage.getItem('hexBest')||'0');
+    this.undoStack = [];
+    this.target = 512;
+    this.lost = false;
+    this.initBoard();
+  }
+
+  initBoard() {
+    this.cells = {};
+    const R = this.radius;
+    for(let q=-R; q<=R; q++){
+      for(let r=-R; r<=R; r++){
+        if(Math.abs(q+r) <= R){
+          this.cells[`${q},${r}`] = 0;
+        }
+      }
+    }
+  }
+
+  coordsToKey(q,r) { return `${q},${r}`; }
+  keyToCoords(key) { const [q,r]=key.split(',').map(Number); return{q,r}; }
+
+  getCell(q,r) { return this.cells[this.coordsToKey(q,r)] ?? null; }
+  setCell(q,r,v) {
+    const k=this.coordsToKey(q,r);
+    if(k in this.cells) this.cells[k]=v;
+  }
+
+  isValid(q,r) { return this.coordsToKey(q,r) in this.cells; }
+  isEmpty(q,r) { return this.getCell(q,r)===0; }
+
+  getNeighbors(q,r) {
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,-1],[-1,1]];
+    return dirs.map(([dq,dr])=>({q:q+dq,r:r+dr}))
+               .filter(({q:nq,r:nr})=>this.isValid(nq,nr));
+  }
+
+  // Place a tile, then cascade merges. Returns merged count and points.
+  placeTile(q, r, value) {
+    if(!this.isEmpty(q,r)) return null;
+    // Save undo state
+    this.undoStack.push({
+      cells: JSON.parse(JSON.stringify(this.cells)),
+      score: this.score,
+      target: this.target,
+      lost: this.lost,
+      pieceQueue: [...pieceQueue],
+      selectedPieceIndex: selectedPieceIndex
+    });
+    if(this.undoStack.length > 5) this.undoStack.shift();
+
+    this.setCell(q,r,value);
+    const merges = this.cascadeMerge(q,r);
+    return merges;
+  }
+
+  // BFS cascade merge: after placing, if any neighbor has same value, merge them
+  cascadeMerge(startQ, startR) {
+    let totalPoints = 0;
+    let mergeList = [];
+
+    let changed = true;
+    while(changed){
+      changed = false;
+      for(const key of Object.keys(this.cells)){
+        const v = this.cells[key];
+        if(v===0) continue;
+        const {q,r} = this.keyToCoords(key);
+        const neighbors = this.getNeighbors(q,r).filter(n=>this.getCell(n.q,n.r)===v);
+        if(neighbors.length>0){
+          // Flood-fill all connected same-value cells
+          const group = this.floodFill(q,r,v);
+          if(group.length >= 2){
+            const newVal = v * 2;
+            const pts = newVal * group.length;
+            totalPoints += pts;
+            mergeList.push({cells:[...group], from:v, to:newVal, pts});
+            // Clear all, place merged at first cell
+            for(const c of group) this.setCell(c.q,c.r,0);
+            this.setCell(group[0].q, group[0].r, newVal);
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+
+    this.score += totalPoints;
+    if(this.score > this.best){
+      this.best = this.score;
+      localStorage.setItem('hexBest', this.best);
+    }
+    return {points: totalPoints, merges: mergeList};
+  }
+
+  floodFill(q,r,val){
+    const visited = new Set();
+    const stack = [{q,r}];
+    const result = [];
+    while(stack.length){
+      const {q:cq,r:cr}=stack.pop();
+      const k=this.coordsToKey(cq,cr);
+      if(visited.has(k)) continue;
+      if(this.getCell(cq,cr)!==val) continue;
+      visited.add(k);
+      result.push({q:cq,r:cr});
+      for(const n of this.getNeighbors(cq,cr)){
+        if(!visited.has(this.coordsToKey(n.q,n.r))) stack.push(n);
+      }
+    }
+    return result;
+  }
+
+  getEmptyCells() {
+    return Object.keys(this.cells).filter(k=>this.cells[k]===0).map(k=>this.keyToCoords(k));
+  }
+
+  isBoardFull() {
+    return this.getEmptyCells().length === 0;
+  }
+
+  hasAnyMerge() {
+    for(const key of Object.keys(this.cells)){
+      const v = this.cells[key];
+      if(v===0) continue;
+      const {q,r}=this.keyToCoords(key);
+      for(const n of this.getNeighbors(q,r)){
+        if(this.getCell(n.q,n.r)===v) return true;
+      }
+    }
+    return false;
+  }
+
+  checkWin() {
+    // Returns true if a tile has reached the current target (and we haven't noted it yet)
+    for(const v of Object.values(this.cells)){
+      if(v >= this.target) return true;
+    }
+    return false;
+  }
+
+  checkLose() {
+    return this.isBoardFull() && !this.hasAnyMerge();
+  }
+
+  undo() {
+    if(this.undoStack.length===0) return false;
+    const state = this.undoStack.pop();
+    this.cells = state.cells;
+    this.score = state.score;
+    this.target = state.target;
+    this.lost = state.lost;
+    pieceQueue = [...state.pieceQueue];
+    selectedPieceIndex = state.selectedPieceIndex;
+    // Make sure a non-null slot is always selected after undo
+    if(pieceQueue[selectedPieceIndex] === null){
+      const next = pieceQueue.findIndex(v => v !== null);
+      selectedPieceIndex = next >= 0 ? next : 0;
+    }
+    return true;
+  }
+}
+
+// ============================================================
+// CANVAS RENDERER
+// ============================================================
+class HexRenderer {
+  constructor(canvas, game) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.game = game;
+    this.animations = [];
+    this.hoveredCell = null;
+    this.selectedPiece = null;
+
+    // Determine size
+    this.resize();
+    window.addEventListener('resize', ()=>this.resize());
+
+    canvas.addEventListener('mousemove', e=>this.onMouseMove(e));
+    canvas.addEventListener('mouseleave', ()=>{ this.hoveredCell=null; this.render(); });
+    canvas.addEventListener('click', e=>this.onClick(e));
+    canvas.addEventListener('touchend', e=>{ e.preventDefault(); this.onTouch(e); }, {passive:false});
+  }
+
+  resize() {
+    const maxW = Math.min(528, window.innerWidth - 64);
+    this.size = Math.floor(maxW / 9.5);
+    const R = this.game.radius;
+    const cols = R*2+1;
+    const rows = R*2+1;
+    this.w = Math.ceil((cols + 0.5) * this.size * Math.sqrt(3));
+    this.h = Math.ceil((rows * 1.5 + 0.5) * this.size);
+    this.canvas.width = this.w;
+    this.canvas.height = this.h;
+    this.canvas.style.width = this.w+'px';
+    this.canvas.style.height = this.h+'px';
+    this.render();
+  }
+
+  hexToPixel(q,r) {
+    const s = this.size;
+    const x = s * Math.sqrt(3) * (q + r/2) + this.w/2;
+    const y = s * 1.5 * r + this.h/2;
+    return {x,y};
+  }
+
+  pixelToHex(px,py) {
+    const s = this.size;
+    const cx = px - this.w/2;
+    const cy = py - this.h/2;
+    const q_f = (cx * Math.sqrt(3)/3 - cy/3) / s;
+    const r_f = cy * 2/3 / s;
+    return this.roundHex(q_f, -q_f-r_f, r_f);
+  }
+
+  roundHex(q,s,r) {
+    let rq=Math.round(q), rs=Math.round(s), rr=Math.round(r);
+    const dq=Math.abs(rq-q), ds=Math.abs(rs-s), dr=Math.abs(rr-r);
+    if(dq>ds && dq>dr) rq=-rs-rr;
+    else if(ds>dr) rs=-rq-rr;
+    else rr=-rq-rs;
+    return {q:rq,r:rr};
+  }
+
+  getEventPos(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY
+    };
+  }
+
+  onMouseMove(e) {
+    const {x,y} = this.getEventPos(e);
+    const {q,r} = this.pixelToHex(x,y);
+    if(this.game.isValid(q,r)) {
+      this.hoveredCell = {q,r};
+    } else {
+      this.hoveredCell = null;
+    }
+    this.render();
+  }
+
+  onTouch(e) {
+    if(e.changedTouches.length===0) return;
+    const t = e.changedTouches[0];
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const x = (t.clientX - rect.left) * scaleX;
+    const y = (t.clientY - rect.top) * scaleY;
+    const {q,r} = this.pixelToHex(x,y);
+    this.handleCellClick(q,r);
+  }
+
+  onClick(e) {
+    const {x,y} = this.getEventPos(e);
+    const {q,r} = this.pixelToHex(x,y);
+    this.handleCellClick(q,r);
+  }
+
+  handleCellClick(q,r) {
+    if(!this.game.isValid(q,r)) return;
+    if(!this.selectedPiece) return;
+    if(!this.game.isEmpty(q,r)) return;
+    if(this.game.lost) return;
+
+    const value = this.selectedPiece.value;
+    const {x,y} = this.hexToPixel(q,r);
+    const result = this.game.placeTile(q,r,value);
+    if(result !== null) {
+      // Trigger animations
+      this.addMergeAnimation(x,y, result.points);
+      updateScoreUI();
+      updatePieces();
+      // Check win/lose
+      if(this.game.checkWin()){
+        // Target achieved! Double it and keep playing
+        const achieved = this.game.target;
+        this.game.target *= 2;
+        updateTargetUI(achieved);
+        showTargetToast(achieved, this.game.target);
+      }
+      if(this.game.checkLose()){
+        this.game.lost = true;
+        setTimeout(()=>showMessage(false, this.game.score), 400);
+      }
+      saveGame();
+    }
+    this.render();
+  }
+
+  addMergeAnimation(x,y,pts) {
+    if(pts<=0) return;
+    // Show score pop in screen coords
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = rect.width / this.canvas.width;
+    const scaleY = rect.height / this.canvas.height;
+    const screenX = rect.left + x * scaleX;
+    const screenY = rect.top + y * scaleY;
+    showScorePop(`+${pts}`, screenX, screenY);
+  }
+
+  drawHex(ctx, cx, cy, size, value, alpha=1, scale=1, glowing=false) {
+    const s = size * scale;
+    const col = getTileColor(value);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.globalAlpha = alpha;
+
+    // Hex path (pointy-top)
+    const path = new Path2D();
+    for(let i=0;i<6;i++){
+      const angle = Math.PI/180 * (60*i - 30);
+      const px = s*0.92 * Math.cos(angle);
+      const py = s*0.92 * Math.sin(angle);
+      i===0 ? path.moveTo(px,py) : path.lineTo(px,py);
+    }
+    path.closePath();
+
+    // Glow
+    if(glowing && value>0){
+      ctx.shadowColor = col.bg;
+      ctx.shadowBlur = 18;
+    }
+
+    // Fill
+    if(value===0){
+      ctx.fillStyle = '#1a3a5c';
+      ctx.globalAlpha = (alpha*0.5);
+      ctx.fill(path);
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = 'rgba(0,212,255,0.08)';
+      ctx.lineWidth = 1;
+      ctx.stroke(path);
+    } else {
+      // Gradient fill
+      const grad = ctx.createRadialGradient(-s*0.2,-s*0.25,s*0.05, 0,0,s*0.92);
+      const base = col.bg;
+      grad.addColorStop(0, lightenColor(base, 40));
+      grad.addColorStop(0.6, base);
+      grad.addColorStop(1, darkenColor(base, 30));
+      ctx.fillStyle = grad;
+      ctx.fill(path);
+
+      // Shine overlay
+      const shine = ctx.createLinearGradient(-s*0.5,-s*0.8,s*0.3,s*0.3);
+      shine.addColorStop(0,'rgba(255,255,255,0.25)');
+      shine.addColorStop(0.4,'rgba(255,255,255,0.05)');
+      shine.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle = shine;
+      ctx.fill(path);
+
+      // Border
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke(path);
+
+      ctx.shadowBlur = 0;
+
+      // Text
+      const fontSize = value >= 1024 ? s*0.38 : value>=128 ? s*0.44 : s*0.5;
+      ctx.font = `900 ${fontSize}px 'Fredoka One', cursive`;
+      ctx.fillStyle = col.text;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,0.4)';
+      ctx.shadowBlur = 4;
+      ctx.fillText(String(value), 0, 1);
+    }
+
+    ctx.restore();
+  }
+
+  render() {
+    const ctx = this.ctx;
+    ctx.clearRect(0,0,this.w,this.h);
+
+    // Background
+    ctx.fillStyle = '#0d1f3c';
+    ctx.fillRect(0,0,this.w,this.h);
+
+    const hovered = this.hoveredCell;
+    const selectedVal = this.selectedPiece?.value || 0;
+
+    for(const key of Object.keys(this.game.cells)){
+      const {q,r} = this.game.game ? this.game.keyToCoords(key) : (() => {
+        const [qq,rr]=key.split(',').map(Number);
+        return {q:qq,r:rr};
+      })();
+      const value = this.game.cells[key];
+      const {x,y} = this.hexToPixel(q,r);
+
+      let scale=1, glowing=false;
+      if(hovered && hovered.q===q && hovered.r===r && value===0 && selectedVal>0){
+        scale=1.05; glowing=true;
+      }
+      if(value>0){
+        const neighbors = this.game.getNeighbors(q,r);
+        if(neighbors.some(n=>this.game.getCell(n.q,n.r)===value)){
+          glowing=true;
+        }
+      }
+      this.drawHex(ctx, x, y, this.size, value, 1, scale, glowing);
+    }
+
+    // Hover ghost preview
+    if(hovered && this.game.isEmpty(hovered.q, hovered.r) && selectedVal>0){
+      const {x,y} = this.hexToPixel(hovered.q, hovered.r);
+      this.drawHex(ctx, x, y, this.size, selectedVal, 0.55, 1.05, false);
+    }
+  }
+}
+
+// Color helpers
+function lightenColor(hex, amount) {
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgb(${Math.min(255,r+amount)},${Math.min(255,g+amount)},${Math.min(255,b+amount)})`;
+}
+function darkenColor(hex, amount) {
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgb(${Math.max(0,r-amount)},${Math.max(0,g-amount)},${Math.max(0,b-amount)})`;
+}
+
+// ============================================================
+// PIECE QUEUE
+// ============================================================
+const ALL_PIECE_VALUES = [2,4,8,16,32,64,128,256,512,1024,2048];
+
+// Get min and max tile values currently on the board (ignoring empty cells)
+function getBoardRange(){
+  let min = Infinity, max = 0;
+  for(const v of Object.values(game.cells)){
+    if(v > 0){
+      if(v < min) min = v;
+      if(v > max) max = v;
+    }
+  }
+  // Fallback: board is completely empty
+  if(max === 0) return { min: 2, max: 2 };
+  return { min, max };
+}
+
+// Generate a single random piece value between boardMin and boardMax (inclusive, powers of 2 only)
+// Weighted toward lower values so the game stays manageable
+function randomPieceValue(){
+  const { min, max } = getBoardRange();
+  const eligible = ALL_PIECE_VALUES.filter(v => v >= min && v <= max);
+  if(eligible.length === 0) return min;
+  // Each step up is ~55% as likely as the step below it
+  const weights = eligible.map((_, i) => Math.pow(0.55, i));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let rnd = Math.random() * total;
+  for(let i = 0; i < eligible.length; i++){
+    rnd -= weights[i];
+    if(rnd <= 0) return eligible[i];
+  }
+  return eligible[0];
+}
+
+// pieceQueue: array of 5 values; null = already placed this round
+// 2 slots = range-based (between board min~max), 3 slots = fully random (any power of 2)
+let pieceQueue = [];
+let selectedPieceIndex = 0;
+
+// Fully random piece: any power of 2 from 2 up to current board max, weighted toward low
+function randomPieceValueFull(){
+  const { max } = getBoardRange();
+  const eligible = ALL_PIECE_VALUES.filter(v => v <= max);
+  if(eligible.length === 0) return 2;
+  const weights = eligible.map((_, i) => Math.pow(0.55, i));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let rnd = Math.random() * total;
+  for(let i = 0; i < eligible.length; i++){
+    rnd -= weights[i];
+    if(rnd <= 0) return eligible[i];
+  }
+  return eligible[0];
+}
+
+function buildPieceQueue(){
+  const boardEmpty = Object.values(game.cells).every(v => v === 0);
+  if(boardEmpty){
+    return [2, 2, 2, 2, 2];
+  }
+  // 2 range-based + 3 fully random, then shuffle
+  const ranged = [randomPieceValue(), randomPieceValue()];
+  const wild   = [randomPieceValueFull(), randomPieceValueFull(), randomPieceValueFull()];
+  const all = [...ranged, ...wild];
+  // Fisher-Yates shuffle so the wilds aren't always at the end
+  for(let i = all.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [all[i], all[j]] = [all[j], all[i]];
+  }
+  return all;
+}
+
+function generatePieces(){
+  pieceQueue = buildPieceQueue();
+  selectedPieceIndex = 0;
+}
+
+function updatePieces(){
+  // Mark the used slot as null (spent)
+  pieceQueue[selectedPieceIndex] = null;
+
+  // Are all 5 slots now spent?
+  const allUsed = pieceQueue.every(v => v === null);
+  if(allUsed){
+    // Replenish: generate a fresh batch of 5
+    pieceQueue = buildPieceQueue();
+    selectedPieceIndex = 0;
+  } else {
+    // Auto-select the next available (non-null) slot
+    selectedPieceIndex = pieceQueue.findIndex(v => v !== null);
+  }
+
+  renderer.selectedPiece = {value: pieceQueue[selectedPieceIndex]};
+  renderPieces();
+  renderer.render();
+}
+
+function renderPieces(){
+  const container = document.getElementById('nextPieces');
+  container.innerHTML = '';
+  pieceQueue.forEach((val, i) => {
+    const used = val === null;
+    const isSelected = !used && i === selectedPieceIndex;
+    const div = document.createElement('div');
+    div.className = 'next-piece' + (isSelected ? ' selected' : '') + (used ? ' used' : '');
+    div.style.opacity = used ? '0.25' : '1';
+    div.style.pointerEvents = used ? 'none' : 'auto';
+    div.innerHTML = `
+      <canvas class="hex-tile" id="pcanvas${i}" width="64" height="72"></canvas>
+      <div class="piece-size-label">${used ? '✓' : val}</div>
+    `;
+    if(!used){
+      div.onclick = () => {
+        selectedPieceIndex = i;
+        renderer.selectedPiece = {value: val};
+        renderPieces();
+        renderer.render();
+      };
+    }
+    container.appendChild(div);
+    // Draw on mini canvas
+    requestAnimationFrame(() => {
+      const pc = document.getElementById(`pcanvas${i}`);
+      if(!pc) return;
+      const pctx = pc.getContext('2d');
+      pctx.clearRect(0, 0, 64, 72);
+      if(used){
+        // Draw a faint empty hex
+        drawMiniHex(pctx, 32, 36, 26, 0);
+      } else {
+        drawMiniHex(pctx, 32, 36, 26, val);
+      }
+    });
+  });
+}
+
+function drawMiniHex(ctx, cx, cy, size, value) {
+  const col = getTileColor(value);
+  const path = new Path2D();
+  for(let i=0;i<6;i++){
+    const angle = Math.PI/180*(60*i-30);
+    const px = cx + size*0.92*Math.cos(angle);
+    const py = cy + size*0.92*Math.sin(angle);
+    i===0?path.moveTo(px,py):path.lineTo(px,py);
+  }
+  path.closePath();
+  const grad = ctx.createRadialGradient(cx-size*0.2,cy-size*0.25,size*0.05,cx,cy,size*0.92);
+  grad.addColorStop(0,lightenColor(col.bg,40));
+  grad.addColorStop(0.6,col.bg);
+  grad.addColorStop(1,darkenColor(col.bg,30));
+  ctx.fillStyle=grad; ctx.fill(path);
+  const shine=ctx.createLinearGradient(cx-size*0.5,cy-size*0.8,cx+size*0.3,cy+size*0.3);
+  shine.addColorStop(0,'rgba(255,255,255,0.3)');
+  shine.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=shine; ctx.fill(path);
+  ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=1.5;ctx.stroke(path);
+  const fs=value>=1024?size*0.42:value>=128?size*0.5:size*0.58;
+  ctx.font=`900 ${fs}px 'Fredoka One',cursive`;
+  ctx.fillStyle=col.text;ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=3;
+  ctx.fillText(String(value),cx,cy+1);
+}
+
+// ============================================================
+// SCORE / UI
+// ============================================================
+function updateScoreUI(){
+  document.getElementById('scoreDisplay').textContent = game.score.toLocaleString();
+  document.getElementById('bestDisplay').textContent = game.best.toLocaleString();
+}
+
+function showScorePop(text, screenX, screenY){
+  const el = document.createElement('div');
+  el.className = 'score-pop';
+  el.textContent = text;
+  el.style.left = screenX + 'px';
+  el.style.top = screenY + 'px';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 1300);
+}
+
+function showMessage(won, score){
+  const overlay = document.getElementById('msgOverlay');
+  const title = document.getElementById('msgTitle');
+  const sub = document.getElementById('msgSub');
+  const scoreEl = document.getElementById('msgScore');
+  title.className = 'msg-title ' + (won?'win':'lose');
+  title.textContent = won ? '🎉 太棒了！' : '😔 遊戲結束';
+  sub.textContent = won ? `達成 ${game.target} 目標！繼續挑戰更高分！` : '棋盤已滿，無法合併！';
+  scoreEl.textContent = `最終分數: ${score.toLocaleString()}`;
+  overlay.classList.add('show');
+}
+
+function showResumeToast(){
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:linear-gradient(135deg,#1a3a5c,#0d2a4a);
+    border:1.5px solid rgba(0,212,255,0.4);border-radius:14px;
+    padding:12px 24px;text-align:center;z-index:9999;
+    box-shadow:0 4px 24px rgba(0,0,0,0.4);
+    font-size:0.85rem;color:rgba(255,255,255,0.8);
+    animation:slideUp 0.35s ease forwards;
+    white-space:nowrap;
+  `;
+  toast.innerHTML = `✅ 已恢復上次的進度`;
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+    @keyframes slideDown{from{opacity:1;transform:translateX(-50%) translateY(0)}to{opacity:0;transform:translateX(-50%) translateY(20px)}}
+  `;
+  document.head.appendChild(style);
+  document.body.appendChild(toast);
+  setTimeout(()=>{
+    toast.style.animation = 'slideDown 0.3s ease forwards';
+    setTimeout(()=>toast.remove(), 320);
+  }, 2200);
+}
+
+function updateTargetUI(achieved){
+  const el = document.getElementById('targetDisplay');
+  el.textContent = game.target;
+  if(achieved === 0) return; // no flash on init
+  // Flash gold animation
+  el.style.transition = 'none';
+  el.style.background = '#ffd700';
+  el.style.transform = 'scale(1.35)';
+  setTimeout(()=>{
+    el.style.transition = 'background 0.7s, transform 0.5s';
+    el.style.background = '';
+    el.style.transform = '';
+  }, 100);
+}
+
+function showTargetToast(achieved, next){
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.8);
+    background:linear-gradient(135deg,#1a3a5c,#0d2a4a);
+    border:2px solid #ffd700;border-radius:20px;
+    padding:20px 32px;text-align:center;z-index:9999;
+    box-shadow:0 8px 40px rgba(255,215,0,0.4);
+    animation:toastIn 0.3s ease forwards;
+  `;
+  toast.innerHTML = `
+    <div style="font-family:'Fredoka One',cursive;font-size:1.5rem;color:#ffd700;margin-bottom:6px">
+      🎉 達成 ${achieved}！
+    </div>
+    <div style="color:rgba(255,255,255,0.7);font-size:0.85rem">
+      新目標：<span style="color:#00d4ff;font-weight:900;font-size:1.1rem">${next}</span>
+    </div>
+  `;
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes toastIn{from{opacity:0;transform:translate(-50%,-50%) scale(0.7)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+    @keyframes toastOut{from{opacity:1;transform:translate(-50%,-50%) scale(1)}to{opacity:0;transform:translate(-50%,-50%) scale(0.8)}}
+  `;
+  document.head.appendChild(style);
+  document.body.appendChild(toast);
+  setTimeout(()=>{
+    toast.style.animation='toastOut 0.3s ease forwards';
+    setTimeout(()=>toast.remove(),320);
+  }, 1800);
+}
+
+// ============================================================
+// GAME INIT
+// ============================================================
+let game, renderer;
+
+function newGame(){
+  document.getElementById('msgOverlay').classList.remove('show');
+  clearSave();
+  game = new HexGame(3);
+  game.target = 512;
+  updateTargetUI(0);
+
+  const canvas = document.getElementById('hexCanvas');
+  renderer = new HexRenderer(canvas, game);
+
+  generatePieces();
+  renderer.selectedPiece = {value: pieceQueue[0]};
+  renderPieces();
+  updateScoreUI();
+  renderer.render();
+}
+
+function undoMove(){
+  if(game.undo()){
+    document.getElementById('msgOverlay').classList.remove('show');
+    updateScoreUI();
+    updateTargetUI(0);
+    renderer.selectedPiece = {value: pieceQueue[selectedPieceIndex]};
+    renderPieces();
+    renderer.render();
+    saveGame();
+  }
+}
+
+// ============================================================
+// SAVE / LOAD
+// ============================================================
+const SAVE_KEY = 'hexPuz_save';
+
+function saveGame(){
+  try {
+    const state = {
+      cells: game.cells,
+      score: game.score,
+      best: game.best,
+      target: game.target,
+      lost: game.lost,
+      pieceQueue: pieceQueue,
+      selectedPieceIndex: selectedPieceIndex,
+      savedAt: Date.now()
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  } catch(e){ /* storage full or unavailable */ }
+}
+
+function loadGame(){
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return false;
+    const state = JSON.parse(raw);
+    // Validate minimal fields
+    if(!state.cells || typeof state.score !== 'number') return false;
+
+    game = new HexGame(3);
+    game.cells = state.cells;
+    game.score = state.score;
+    game.best = Math.max(state.best || 0, parseInt(localStorage.getItem('hexBest')||'0'));
+    game.target = state.target || 512;
+    game.lost = state.lost || false;
+
+    pieceQueue = Array.isArray(state.pieceQueue) && state.pieceQueue.length === 5
+      ? state.pieceQueue
+      : buildPieceQueue();
+    selectedPieceIndex = state.selectedPieceIndex ?? 0;
+    // Guard: make sure selected slot isn't null
+    if(pieceQueue[selectedPieceIndex] === null){
+      const next = pieceQueue.findIndex(v => v !== null);
+      selectedPieceIndex = next >= 0 ? next : 0;
+    }
+    return true;
+  } catch(e){ return false; }
+}
+
+function clearSave(){
+  localStorage.removeItem(SAVE_KEY);
+}
+
+// ============================================================
+// Start!
+// ============================================================
+(function(){
+  const canvas = document.getElementById('hexCanvas');
+  const loaded = loadGame();
+  if(loaded){
+    // Resume saved game
+    renderer = new HexRenderer(canvas, game);
+    renderer.selectedPiece = {value: pieceQueue[selectedPieceIndex]};
+    renderPieces();
+    updateScoreUI();
+    updateTargetUI(0);
+    renderer.render();
+    // Show resume toast
+    showResumeToast();
+  } else {
+    newGame();
+  }
+})();
+</script>
+</body>
+</html>
